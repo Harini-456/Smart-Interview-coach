@@ -1,25 +1,30 @@
 import axios from "axios";
 
-//const API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent";
-const API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
-
-export const callGemini = async (prompt) => {
+export const callAI = async (prompt) => {
+  console.log("KEY:", process.env.GEMINI_API_KEY);
   try {
     const response = await axios.post(
-      `${API_URL}?key=${process.env.GEMINI_API_KEY}`,
+      "https://openrouter.ai/api/v1/chat/completions",
       {
-        contents: [
-          {
-            parts: [{ text: prompt }]
-          }
+        model: "openai/gpt-3.5-turbo",
+        messages: [
+          { role: "user", content: prompt }
         ]
+      },
+      {
+        headers: {
+          "Authorization": `Bearer ${process.env.GEMINI_API_KEY}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": "http://localhost:5000",   // ✅ REQUIRED
+          "X-Title": "Smart Interview Coach"         // ✅ RECOMMENDED
+        }
       }
     );
 
-    return response.data.candidates[0].content.parts[0].text;
+    return response.data.choices[0].message.content;
 
   } catch (error) {
-    console.error("Gemini Error:", error.response?.data || error.message);
-    throw new Error("AI request failed");
+    console.error("AI Error:", error.response?.data || error.message);
+    return "Error generating response";
   }
 };

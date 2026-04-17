@@ -6,7 +6,16 @@ const interviewSchema = new mongoose.Schema({
     ref: "User"
   },
   role: String,
-  questions: [String],
+  questions: [
+  {
+    type: {
+      type: String
+    },
+    question: String,
+    options: [String],
+    correctAnswer: String
+  }
+],
   answers: [String],
   feedback: [String],
   scores: [Number],
