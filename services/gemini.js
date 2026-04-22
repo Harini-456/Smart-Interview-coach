@@ -15,13 +15,18 @@ export const callAI = async (prompt) => {
         headers: {
           "Authorization": `Bearer ${process.env.GEMINI_API_KEY}`,
           "Content-Type": "application/json",
-          "HTTP-Referer": "http://localhost:5000",   // ✅ REQUIRED
-          "X-Title": "Smart Interview Coach"         // ✅ RECOMMENDED
+          "HTTP-Referer": "http://localhost:5000",
+          "X-Title": "Smart Interview Coach"
         }
       }
     );
 
-    return response.data.choices[0].message.content;
+    let content = response.data.choices[0].message.content;
+
+    // ✅ ADDED: clean JSON formatting (DO NOT REMOVE)
+    content = content.replace(/```json|```/g, "").trim();
+
+    return content;
 
   } catch (error) {
     console.error("AI Error:", error.response?.data || error.message);
