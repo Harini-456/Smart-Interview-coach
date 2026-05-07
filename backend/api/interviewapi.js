@@ -16,7 +16,8 @@ router.post("/start", async (req, res) => {
       type,
       category,
       experienceLevel,
-      numQuestions
+      numQuestions,
+      questionFormat
     } = req.body;
 
     if (!userId || !role || !type) {
@@ -27,50 +28,112 @@ router.post("/start", async (req, res) => {
 
     const totalQ = Math.min(numQuestions || 3, 10);
 
-    let prompt = `
-Generate EXACTLY ${totalQ} ${type.toUpperCase()} interview questions.
+    // Determine question format rules
+    const fmt = (questionFormat || "mixed").toLowerCase();
+    let formatRule = "";
+    if (fmt === "mcq") {
+      formatRule = `- ALL questions must be MCQ type with exactly 4 options and one correct answer.`;
+    } else if (fmt === "text") {
+      formatRule = `- ALL questions must be TEXT type (open-ended written answers). Do NOT generate any MCQ.`;
+    } else {
+      formatRule = `- Mix MCQ and TEXT questions roughly equally.`;
+    }
+
+    // Difficulty-specific instructions
+    const difficultyMap = {
+      beginner: "basic, foundational, definition-level questions. Suitable for someone just starting out. Avoid complex scenarios.",
+      intermediate: "applied, scenario-based questions that test practical knowledge and problem-solving. Assume 2-5 years of experience.",
+      advanced: "deep, expert-level questions involving edge cases, system design trade-offs, optimization, and complex real-world scenarios. Assume 5+ years of experience. Do NOT ask basic or simple questions."
+    };
+    const difficultyInstruction = difficultyMap[level] || difficultyMap["intermediate"];
+
+    // Behavioral question enhancement
+    const behavioralGuidance = type === "behavioral" || type === "mixed"
+      ? `\n\nBEHAVIORAL QUESTION REQUIREMENTS (CRITICAL):
+- Questions MUST be realistic, precise, and adaptive to the role and experience level.
+- Use STAR method framework (Situation, Task, Action, Result).
+- Ask about specific scenarios: conflict resolution, leadership, failure handling, decision-making under pressure, ethical dilemmas, team dynamics.
+- Make questions tricky by including multi-layered scenarios (e.g., "Describe a time you had to choose between meeting a deadline and maintaining code quality. What factors did you consider?").
+- For ${level} difficulty: ${level === "advanced" ? "Ask about strategic decisions, organizational impact, mentoring others through challenges, or navigating ambiguous situations with incomplete information." : level === "intermediate" ? "Focus on collaboration challenges, prioritization under constraints, and learning from mistakes." : "Ask about basic teamwork, communication, and handling feedback."}
+- Avoid generic questions like "Tell me about yourself" or "What are your strengths?".
+- Examples of good behavioral questions:
+  * "Describe a situation where you had to advocate for a technical decision that your team initially disagreed with. How did you approach it?"
+  * "Tell me about a time when you missed a critical bug in production. What was your response and what did you learn?"
+  * "Give an example of when you had to balance technical debt against new feature development. How did you make the decision?"`
+      : "";
+
+    const prompt = `You are a professional interview question generator.
+
+Generate exactly ${totalQ} interview questions with the following strict requirements:
 
 Role: ${role}
-Experience: ${experienceLevel}
-Category: ${category}
-Difficulty: ${level}
+Category: ${category || "General"}
+Experience Level: ${experienceLevel || "intermediate"}
+Difficulty: ${level || "intermediate"}
+Interview Type: ${type}
 
-STRICT:
-- Return ONLY JSON objects
-- DO NOT number questions
-- Use:
-  "question_type": "MCQ" or "TEXT"
-`;
+DIFFICULTY REQUIREMENT (CRITICAL):
+- Questions must be ${difficultyInstruction}${behavioralGuidance}
+
+QUESTION FORMAT RULES:
+${formatRule}
+- For behavioral interview type, use only TEXT questions regardless of format.
+- Each MCQ must have exactly 4 distinct options and one correct answer.
+
+OUTPUT RULES:
+- Return ONLY a valid JSON array. No markdown, no code blocks, no explanation.
+- Every question object must have "question_type" as either "MCQ" or "TEXT".
+
+JSON Format:
+[
+  {
+    "question_type": "MCQ",
+    "question": "Your question here?",
+    "options": ["Option A", "Option B", "Option C", "Option D"],
+    "correct_answer": "Option A"
+  },
+  {
+    "question_type": "TEXT",
+    "question": "Your open-ended question here?"
+  }
+]`;
 
     const aiText = await callAI(prompt);
 
     let rawQuestions = [];
 
     try {
-      const matches = aiText.match(/\{[\s\S]*?\}/g);
+      // Try to parse the full response as JSON array first
+      const cleaned = aiText.trim();
+      const jsonStart = cleaned.indexOf("[");
+      const jsonEnd = cleaned.lastIndexOf("]");
 
-      if (!matches || matches.length === 0) {
-        throw new Error("No questions found");
+      if (jsonStart === -1 || jsonEnd === -1) {
+        throw new Error("No JSON array found in AI response");
       }
 
-      rawQuestions = matches.map(q => JSON.parse(q));
+      const jsonStr = cleaned.substring(jsonStart, jsonEnd + 1);
+      rawQuestions = JSON.parse(jsonStr);
+
+      if (!Array.isArray(rawQuestions) || rawQuestions.length === 0) {
+        throw new Error("AI returned empty or invalid array");
+      }
 
     } catch (err) {
-      console.error("❌ Parse error:", err);
-      return res.status(500).json({ message: "AI format error" });
+      console.error("❌ Parse error:", err.message);
+      console.error("Raw AI text:", aiText);
+      return res.status(500).json({ message: "AI returned an invalid format. Please try again." });
     }
 
-    let questions = rawQuestions.map(q => {
-      const qType = q.question_type?.toLowerCase();
+    let questions = rawQuestions.slice(0, totalQ).map(q => {
+      const qType = (q.question_type || "text").toLowerCase();
 
-      if (qType === "mcq") {
+      if (qType === "mcq" && Array.isArray(q.options) && q.options.length === 4) {
         return {
           type: "mcq",
           question: q.question,
-          options: q.options?.length === 4
-            ? q.options
-            : ["Option A", "Option B", "Option C", "Option D"],
-          correctAnswer: q.options?.[0] || "Option A"
+          options: q.options,
+          correctAnswer: q.correct_answer || q.options[0]
         };
       }
 
@@ -80,24 +143,7 @@ STRICT:
         options: [],
         correctAnswer: ""
       };
-    });
-
-    if (questions.length < totalQ) {
-      const missing = totalQ - questions.length;
-
-      for (let i = 0; i < missing; i++) {
-        questions.push({
-          type: "text",
-          question: `Fallback Question ${i + 1}`,
-          options: [],
-          correctAnswer: ""
-        });
-      }
-    }
-
-    if (questions.length > totalQ) {
-      questions = questions.slice(0, totalQ);
-    }
+    }).filter(q => q.question && q.question.trim() !== "");
 
     const interview = new Interview({
       userId: userId.toString(),
@@ -148,23 +194,41 @@ router.post("/answer/:id", async (req, res) => {
 
     for (let i = 0; i < interview.questions.length; i++) {
       const q = interview.questions[i];
-      const ans = answers[i];
+      const ans = answers[i] || "";
 
       if (q.type === "mcq") {
-        const correct = ans === q.correctAnswer;
-
-        scores.push(correct ? 10 : 0);
-
+        const correct = ans.trim() === q.correctAnswer.trim();
+        // MCQ: 20 pts each (so 5 questions = 100)
+        const pts = Math.round(100 / interview.questions.length);
+        scores.push(correct ? pts : 0);
         feedback.push({
-          text: correct ? "Correct" : `Correct answer: ${q.correctAnswer}`,
-          score: correct ? 10 : 0
+          text: correct
+            ? "✅ Correct answer!"
+            : `❌ Wrong. Correct answer: ${q.correctAnswer}`,
+          score: correct ? pts : 0
         });
       } else {
-        scores.push(5);
-        feedback.push({
-          text: "Answer submitted",
-          score: 5
-        });
+        const wordCount = ans.trim().split(/\s+/).filter(Boolean).length;
+        const maxPts = Math.round(100 / interview.questions.length);
+        let score = 0;
+        let feedbackText = "";
+
+        if (wordCount === 0) {
+          score = 0;
+          feedbackText = "No answer provided.";
+        } else if (wordCount < 10) {
+          score = Math.round(maxPts * 0.3);
+          feedbackText = "Answer is too brief. Try to elaborate more.";
+        } else if (wordCount < 30) {
+          score = Math.round(maxPts * 0.6);
+          feedbackText = "Good attempt. A more detailed answer would score higher.";
+        } else {
+          score = maxPts;
+          feedbackText = "Great answer! Well explained.";
+        }
+
+        scores.push(score);
+        feedback.push({ text: feedbackText, score });
       }
     }
 
@@ -173,7 +237,8 @@ router.post("/answer/:id", async (req, res) => {
     interview.scores = scores;
     interview.status = "completed";
     interview.endTime = new Date();
-    interview.totalScore = scores.reduce((a, b) => a + b, 0);
+    // Cap at 100
+    interview.totalScore = Math.min(scores.reduce((a, b) => a + b, 0), 100);
 
     await interview.save();
 

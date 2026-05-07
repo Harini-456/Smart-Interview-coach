@@ -68,6 +68,10 @@ router.post("/login", async (req, res) => {
     if (!isMatch)
       return res.status(400).json({ message: "Invalid credentials" });
 
+    if (user.role === "blocked") {
+      return res.status(403).json({ message: "Your account has been blocked. Contact admin." });
+    }
+
     const token = jwt.sign(
       { id: user._id },
       process.env.SECRET_CODE,
@@ -75,14 +79,15 @@ router.post("/login", async (req, res) => {
     );
 
     return res.json({
-  message: "Login successful",
-  token,
-  user: {
-    id: user._id,
-    name: user.name,
-    email: user.email
-  }
-});
+      message: "Login successful",
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role
+      }
+    });
 
   } catch (err) {
     console.error(err);
