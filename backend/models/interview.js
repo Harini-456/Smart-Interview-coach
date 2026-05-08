@@ -17,7 +17,8 @@ const interviewSchema = new mongoose.Schema({
       },
       question: String,
       options: [String],
-      correctAnswer: String
+      correctAnswer: String,
+      expectedConcepts: [String]
     }
   ],
 

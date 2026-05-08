@@ -1,13 +1,13 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import API from "@/lib/api";
 import Sidebar from "@/components/Sidebar";
 import Navbar from "@/components/Navbar";
 import Loader from "@/components/Loader";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { PlayCircle, Clock, Zap, Brain, Target, BookOpen, ChevronRight } from "lucide-react";
+import { PlayCircle, Clock, Zap, Brain, Target, Mic, ChevronRight } from "lucide-react";
 
 const MINUTES_PER_QUESTION = 2;
 
@@ -33,9 +33,12 @@ const FIELD = ({ label, children, required }) => (
 
 export default function InterviewPage() {
   const [form, setForm] = useState({
-    role: "", type: "technical", questionFormat: "mixed",
-    level: "intermediate", category: "Software Development",
-    experienceLevel: "intermediate", numQuestions: 5,
+    role: "",
+    type: "technical",
+    level: "intermediate",
+    category: "Software Development",
+    experienceLevel: "intermediate",
+    numQuestions: 5,
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -48,7 +51,12 @@ export default function InterviewPage() {
     setLoading(true);
     try {
       const userId = localStorage.getItem("userId");
-      const res = await API.post("/interview/start", { userId, ...form, timerMinutes });
+      const res = await API.post("/interview/start", {
+        userId,
+        ...form,
+        questionFormat: "voice",
+        timerMinutes,
+      });
       localStorage.setItem("interview", JSON.stringify({ ...res.data, timerMinutes }));
       router.push("/results");
     } catch (err) {
@@ -57,9 +65,13 @@ export default function InterviewPage() {
     }
   };
 
-  if (loading) return <Loader text="AI is generating your questions..." />;
+  if (loading) return <Loader text="AI is generating your interview questions..." />;
 
-  const difficultyColors = { beginner: "text-emerald-500", intermediate: "text-amber-500", advanced: "text-red-500" };
+  const difficultyColors = {
+    beginner: "text-emerald-500",
+    intermediate: "text-amber-500",
+    advanced: "text-red-500",
+  };
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -69,18 +81,26 @@ export default function InterviewPage() {
         <main className="flex-1 p-6">
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
             <h1 className="text-3xl font-bold text-foreground">Start New Interview</h1>
-            <p className="text-muted-foreground mt-1 text-sm">Configure your AI-powered mock interview session</p>
+            <p className="text-muted-foreground mt-1 text-sm">Configure your AI-powered voice interview session</p>
           </motion.div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Form */}
             <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
               className="lg:col-span-2 bg-card border border-border rounded-2xl p-6 space-y-5">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center">
-                  <Brain size={16} className="text-indigo-500" />
+
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center">
+                    <Brain size={16} className="text-indigo-500" />
+                  </div>
+                  <h2 className="font-semibold text-foreground">Interview Configuration</h2>
                 </div>
-                <h2 className="font-semibold text-foreground">Interview Configuration</h2>
+                {/* Voice mode badge */}
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-indigo-500/10 to-violet-500/10 border border-indigo-500/20">
+                  <Mic size={13} className="text-indigo-500" />
+                  <span className="text-xs font-semibold text-indigo-500">Voice Mode</span>
+                </div>
               </div>
 
               {error && (
@@ -96,6 +116,7 @@ export default function InterviewPage() {
                   placeholder="e.g. Frontend Developer, Data Scientist, Product Manager"
                   value={form.role}
                   onChange={(e) => setForm({ ...form, role: e.target.value })}
+                  onKeyDown={(e) => e.key === "Enter" && startInterview()}
                   className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/50 transition-all"
                 />
               </FIELD>
@@ -117,17 +138,6 @@ export default function InterviewPage() {
                       <SelectItem value="technical">Technical</SelectItem>
                       <SelectItem value="behavioral">Behavioral</SelectItem>
                       <SelectItem value="mixed">Mixed</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </FIELD>
-
-                <FIELD label="Question Format">
-                  <Select value={form.questionFormat} onValueChange={(v) => setForm({ ...form, questionFormat: v })}>
-                    <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="mcq">MCQ Only</SelectItem>
-                      <SelectItem value="text">Text Only</SelectItem>
-                      <SelectItem value="mixed">Mixed (MCQ + Text)</SelectItem>
                     </SelectContent>
                   </Select>
                 </FIELD>
@@ -172,12 +182,13 @@ export default function InterviewPage() {
                 onClick={startInterview}
                 className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-semibold text-sm bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-400 hover:to-violet-500 text-white shadow-lg shadow-indigo-500/25 transition-all mt-2"
               >
-                <PlayCircle size={18} /> Start Interview
+                <PlayCircle size={18} /> Start Voice Interview
               </motion.button>
             </motion.div>
 
-            {/* Summary panel */}
+            {/* Right panel */}
             <div className="space-y-4">
+              {/* Session summary */}
               <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
                 className="bg-card border border-border rounded-2xl p-5">
                 <h3 className="font-semibold text-foreground text-sm mb-4 flex items-center gap-2">
@@ -188,7 +199,6 @@ export default function InterviewPage() {
                     ["Role", form.role || "—"],
                     ["Category", form.category],
                     ["Type", form.type],
-                    ["Format", form.questionFormat],
                     ["Difficulty", form.level],
                     ["Questions", form.numQuestions],
                   ].map(([k, v]) => (
@@ -201,20 +211,28 @@ export default function InterviewPage() {
                     <span className="text-muted-foreground flex items-center gap-1.5"><Clock size={13} /> Time Limit</span>
                     <span className="font-bold text-indigo-500">{timerMinutes} min</span>
                   </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground flex items-center gap-1.5"><Mic size={13} /> Mode</span>
+                    <span className="font-bold text-indigo-500">Voice First</span>
+                  </div>
                 </div>
               </motion.div>
 
+              {/* Tips */}
               <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}
                 className="bg-gradient-to-br from-indigo-500/10 to-violet-500/10 border border-indigo-500/20 rounded-2xl p-5">
                 <h3 className="font-semibold text-foreground text-sm mb-3 flex items-center gap-2">
-                  <Zap size={15} className="text-indigo-500" /> Tips
+                  <Zap size={15} className="text-indigo-500" /> Voice Interview Tips
                 </h3>
                 <ul className="space-y-2 text-xs text-muted-foreground">
-                  {["Timer starts immediately when interview loads",
-                    "For text answers, write 30+ words for full marks",
-                    "MCQ answers are auto-scored instantly",
-                    "You can navigate between questions freely",
-                    "Exit button available if you need to quit"].map((tip, i) => (
+                  {[
+                    "Allow microphone access when prompted",
+                    "Speak clearly and at a natural pace",
+                    "You can edit the transcript after speaking",
+                    "Tap mic again to pause and resume",
+                    "Aim for 30+ words per answer for full marks",
+                    "Timer starts as soon as the interview loads",
+                  ].map((tip, i) => (
                     <li key={i} className="flex items-start gap-2">
                       <ChevronRight size={12} className="text-indigo-500 mt-0.5 flex-shrink-0" />
                       {tip}
@@ -223,22 +241,22 @@ export default function InterviewPage() {
                 </ul>
               </motion.div>
 
+              {/* Scoring */}
               <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
                 className="bg-card border border-border rounded-2xl p-5">
                 <h3 className="font-semibold text-foreground text-sm mb-3 flex items-center gap-2">
-                  <BookOpen size={15} className="text-indigo-500" /> Scoring Guide
+                  <Brain size={15} className="text-indigo-500" /> AI Scoring Criteria
                 </h3>
                 <div className="space-y-2 text-xs">
                   {[
-                    ["MCQ Correct", "Full marks", "text-emerald-500"],
-                    ["MCQ Wrong", "0 marks", "text-red-500"],
-                    ["Text 30+ words", "Full marks", "text-emerald-500"],
-                    ["Text 10–29 words", "60% marks", "text-amber-500"],
-                    ["Text < 10 words", "30% marks", "text-orange-500"],
-                  ].map(([label, val, color]) => (
+                    ["Keyword Relevance", "25 pts"],
+                    ["Topic Coverage", "25 pts"],
+                    ["Answer Completeness", "25 pts"],
+                    ["Communication Quality", "25 pts"],
+                  ].map(([label, val]) => (
                     <div key={label} className="flex justify-between">
                       <span className="text-muted-foreground">{label}</span>
-                      <span className={`font-medium ${color}`}>{val}</span>
+                      <span className="font-medium text-indigo-500">{val}</span>
                     </div>
                   ))}
                 </div>

@@ -17,7 +17,6 @@ router.post("/start", async (req, res) => {
       category,
       experienceLevel,
       numQuestions,
-      questionFormat
     } = req.body;
 
     if (!userId || !role || !type) {
@@ -27,17 +26,6 @@ router.post("/start", async (req, res) => {
     }
 
     const totalQ = Math.min(numQuestions || 3, 10);
-
-    // Determine question format rules
-    const fmt = (questionFormat || "mixed").toLowerCase();
-    let formatRule = "";
-    if (fmt === "mcq") {
-      formatRule = `- ALL questions must be MCQ type with exactly 4 options and one correct answer.`;
-    } else if (fmt === "text") {
-      formatRule = `- ALL questions must be TEXT type (open-ended written answers). Do NOT generate any MCQ.`;
-    } else {
-      formatRule = `- Mix MCQ and TEXT questions roughly equally.`;
-    }
 
     // Difficulty-specific instructions
     const difficultyMap = {
@@ -53,18 +41,14 @@ router.post("/start", async (req, res) => {
 - Questions MUST be realistic, precise, and adaptive to the role and experience level.
 - Use STAR method framework (Situation, Task, Action, Result).
 - Ask about specific scenarios: conflict resolution, leadership, failure handling, decision-making under pressure, ethical dilemmas, team dynamics.
-- Make questions tricky by including multi-layered scenarios (e.g., "Describe a time you had to choose between meeting a deadline and maintaining code quality. What factors did you consider?").
+- Make questions tricky by including multi-layered scenarios.
 - For ${level} difficulty: ${level === "advanced" ? "Ask about strategic decisions, organizational impact, mentoring others through challenges, or navigating ambiguous situations with incomplete information." : level === "intermediate" ? "Focus on collaboration challenges, prioritization under constraints, and learning from mistakes." : "Ask about basic teamwork, communication, and handling feedback."}
-- Avoid generic questions like "Tell me about yourself" or "What are your strengths?".
-- Examples of good behavioral questions:
-  * "Describe a situation where you had to advocate for a technical decision that your team initially disagreed with. How did you approach it?"
-  * "Tell me about a time when you missed a critical bug in production. What was your response and what did you learn?"
-  * "Give an example of when you had to balance technical debt against new feature development. How did you make the decision?"`
+- Avoid generic questions like "Tell me about yourself" or "What are your strengths?".`
       : "";
 
-    const prompt = `You are a professional interview question generator.
+    const prompt = `You are a professional voice interview question generator.
 
-Generate exactly ${totalQ} interview questions with the following strict requirements:
+Generate exactly ${totalQ} open-ended interview questions for a VOICE interview.
 
 Role: ${role}
 Category: ${category || "General"}
@@ -75,26 +59,22 @@ Interview Type: ${type}
 DIFFICULTY REQUIREMENT (CRITICAL):
 - Questions must be ${difficultyInstruction}${behavioralGuidance}
 
-QUESTION FORMAT RULES:
-${formatRule}
-- For behavioral interview type, use only TEXT questions regardless of format.
-- Each MCQ must have exactly 4 distinct options and one correct answer.
+IMPORTANT RULES:
+- ALL questions must be open-ended TEXT questions suitable for spoken voice answers.
+- Do NOT generate MCQ or multiple choice questions.
+- Each question should require a detailed spoken explanation (30+ words to answer well).
+- Questions should test depth of knowledge, reasoning, and communication.
+- Include "expected_concepts" — 3 to 5 key concepts/keywords a good answer should mention.
 
 OUTPUT RULES:
 - Return ONLY a valid JSON array. No markdown, no code blocks, no explanation.
-- Every question object must have "question_type" as either "MCQ" or "TEXT".
 
 JSON Format:
 [
   {
-    "question_type": "MCQ",
-    "question": "Your question here?",
-    "options": ["Option A", "Option B", "Option C", "Option D"],
-    "correct_answer": "Option A"
-  },
-  {
     "question_type": "TEXT",
-    "question": "Your open-ended question here?"
+    "question": "Your open-ended question here?",
+    "expected_concepts": ["concept1", "concept2", "concept3"]
   }
 ]`;
 
@@ -126,22 +106,12 @@ JSON Format:
     }
 
     let questions = rawQuestions.slice(0, totalQ).map(q => {
-      const qType = (q.question_type || "text").toLowerCase();
-
-      if (qType === "mcq" && Array.isArray(q.options) && q.options.length === 4) {
-        return {
-          type: "mcq",
-          question: q.question,
-          options: q.options,
-          correctAnswer: q.correct_answer || q.options[0]
-        };
-      }
-
       return {
         type: "text",
         question: q.question,
         options: [],
-        correctAnswer: ""
+        correctAnswer: "",
+        expectedConcepts: Array.isArray(q.expected_concepts) ? q.expected_concepts : []
       };
     }).filter(q => q.question && q.question.trim() !== "");
 
@@ -165,7 +135,8 @@ JSON Format:
     const safeQuestions = questions.map(q => ({
       type: q.type,
       question: q.question,
-      options: q.options
+      options: q.options,
+      expectedConcepts: q.expectedConcepts
     }));
 
     res.json({
@@ -191,45 +162,76 @@ router.post("/answer/:id", async (req, res) => {
 
     let feedback = [];
     let scores = [];
+    const maxPts = Math.round(100 / interview.questions.length);
 
     for (let i = 0; i < interview.questions.length; i++) {
       const q = interview.questions[i];
-      const ans = answers[i] || "";
+      const ans = (answers[i] || "").trim();
+      const wordCount = ans.split(/\s+/).filter(Boolean).length;
+      const expectedConcepts = q.expectedConcepts || [];
 
-      if (q.type === "mcq") {
-        const correct = ans.trim() === q.correctAnswer.trim();
-        // MCQ: 20 pts each (so 5 questions = 100)
-        const pts = Math.round(100 / interview.questions.length);
-        scores.push(correct ? pts : 0);
-        feedback.push({
-          text: correct
-            ? "✅ Correct answer!"
-            : `❌ Wrong. Correct answer: ${q.correctAnswer}`,
-          score: correct ? pts : 0
-        });
-      } else {
-        const wordCount = ans.trim().split(/\s+/).filter(Boolean).length;
-        const maxPts = Math.round(100 / interview.questions.length);
-        let score = 0;
-        let feedbackText = "";
-
-        if (wordCount === 0) {
-          score = 0;
-          feedbackText = "No answer provided.";
-        } else if (wordCount < 10) {
-          score = Math.round(maxPts * 0.3);
-          feedbackText = "Answer is too brief. Try to elaborate more.";
-        } else if (wordCount < 30) {
-          score = Math.round(maxPts * 0.6);
-          feedbackText = "Good attempt. A more detailed answer would score higher.";
-        } else {
-          score = maxPts;
-          feedbackText = "Great answer! Well explained.";
-        }
-
-        scores.push(score);
-        feedback.push({ text: feedbackText, score });
+      if (!ans || wordCount === 0) {
+        scores.push(0);
+        feedback.push({ text: "No answer provided. Speak or type your response to earn marks.", score: 0 });
+        continue;
       }
+
+      // AI-based scoring: keyword relevance + topic coverage + completeness + communication
+      const answerLower = ans.toLowerCase();
+
+      // 1. Keyword relevance (25%)
+      const matchedConcepts = expectedConcepts.filter(c =>
+        answerLower.includes(c.toLowerCase())
+      );
+      const keywordScore = expectedConcepts.length > 0
+        ? Math.round((matchedConcepts.length / expectedConcepts.length) * 25)
+        : (wordCount >= 20 ? 20 : Math.round((wordCount / 20) * 20));
+
+      // 2. Topic relevance — check if answer relates to the question (25%)
+      const questionWords = q.question.toLowerCase().split(/\s+/).filter(w => w.length > 4);
+      const topicMatches = questionWords.filter(w => answerLower.includes(w)).length;
+      const topicScore = Math.min(25, Math.round((topicMatches / Math.max(questionWords.length, 1)) * 40));
+
+      // 3. Answer completeness based on word count (25%)
+      let completenessScore = 0;
+      if (wordCount >= 60) completenessScore = 25;
+      else if (wordCount >= 40) completenessScore = 20;
+      else if (wordCount >= 25) completenessScore = 15;
+      else if (wordCount >= 15) completenessScore = 10;
+      else if (wordCount >= 8) completenessScore = 5;
+
+      // 4. Communication quality — sentence structure, variety (25%)
+      const sentences = ans.split(/[.!?]+/).filter(s => s.trim().length > 5);
+      const avgWordsPerSentence = wordCount / Math.max(sentences.length, 1);
+      let commScore = 0;
+      if (sentences.length >= 3 && avgWordsPerSentence >= 8 && avgWordsPerSentence <= 25) commScore = 25;
+      else if (sentences.length >= 2 && avgWordsPerSentence >= 5) commScore = 18;
+      else if (sentences.length >= 1) commScore = 10;
+
+      const rawScore = keywordScore + topicScore + completenessScore + commScore;
+      // Scale to maxPts per question
+      const finalScore = Math.min(maxPts, Math.round((rawScore / 100) * maxPts));
+
+      scores.push(finalScore);
+
+      // Build detailed feedback
+      const conceptsFeedback = expectedConcepts.length > 0
+        ? matchedConcepts.length > 0
+          ? `Covered concepts: ${matchedConcepts.join(", ")}.`
+          : `Key concepts to mention: ${expectedConcepts.slice(0, 3).join(", ")}.`
+        : "";
+
+      let qualityLabel = "";
+      if (rawScore >= 80) qualityLabel = "Excellent response — well-structured and comprehensive.";
+      else if (rawScore >= 60) qualityLabel = "Good response — covers the topic with reasonable depth.";
+      else if (rawScore >= 40) qualityLabel = "Average response — try to elaborate more with specific examples.";
+      else if (rawScore >= 20) qualityLabel = "Brief response — needs more detail and relevant concepts.";
+      else qualityLabel = "Very short response — please provide a more complete answer.";
+
+      feedback.push({
+        text: `${qualityLabel} ${conceptsFeedback} (${wordCount} words spoken)`.trim(),
+        score: finalScore
+      });
     }
 
     interview.answers = answers;
