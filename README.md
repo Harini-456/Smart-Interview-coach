@@ -1,4 +1,4 @@
-# Smart Interview Coach 🚀
+# Smart Interview Coach: An AI-Driven Interview Practice System 👨‍💻🚀
 
 An AI-powered full-stack interview preparation platform designed to help students and job seekers improve their interview skills through AI-generated mock interviews, voice-based interaction, analytics dashboards, and personalized feedback systems.
 
