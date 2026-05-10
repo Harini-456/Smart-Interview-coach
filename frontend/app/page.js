@@ -37,7 +37,7 @@ export default function HomePage() {
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center">
             <Brain size={18} className="text-white" />
           </div>
-          <span className="font-bold text-xl tracking-tight">SIC</span>
+          <span className="font-bold text-xl tracking-tight text-black">SIC</span>
         </motion.div>
 
         <motion.div
@@ -66,7 +66,7 @@ export default function HomePage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 border border-white/20 text-sm mb-8 backdrop-blur-sm"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 border border-white/20 text-sm mb-8 backdrop-blur-sm text-black"
         >
           <Sparkles size={14} className="text-yellow-400" />
           <span>AI-Powered Interview Coaching Platform</span>
@@ -76,7 +76,7 @@ export default function HomePage() {
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="text-6xl md:text-7xl font-extrabold leading-tight tracking-tight mb-6"
+          className="text-6xl md:text-7xl font-extrabold leading-tight tracking-tight mb-6 text-white"
         >
           Smart Interview
           <br />
@@ -87,7 +87,7 @@ export default function HomePage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="text-2xl md:text-3xl font-light text-white/70 mb-4 italic"
+          className="text-2xl md:text-3xl font-light text-white mb-4 italic"
         >
           &ldquo;Elevate your professional narrative!&rdquo;
         </motion.p>
@@ -96,7 +96,7 @@ export default function HomePage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
-          className="text-lg text-white/50 max-w-2xl mb-12"
+          className="text-lg text-white max-w-2xl mb-12"
         >
           Practice with AI-generated questions, get instant feedback, track your progress,
           and walk into every interview with confidence.
@@ -132,7 +132,7 @@ export default function HomePage() {
           className="flex items-center gap-1 mt-8 text-yellow-400"
         >
           {[...Array(5)].map((_, i) => <Star key={i} size={16} fill="currentColor" />)}
-          <span className="text-white/50 text-sm ml-2">Trusted by students & professionals</span>
+          <span className="text-black/60 text-sm ml-2">Trusted by students & professionals</span>
         </motion.div>
       </section>
 
@@ -147,7 +147,7 @@ export default function HomePage() {
           {stats.map((stat, i) => (
             <div key={i} className="glass rounded-2xl p-6 text-center">
               <p className="text-3xl font-extrabold gradient-text mb-1">{stat.value}</p>
-              <p className="text-white/50 text-sm">{stat.label}</p>
+              <p className="text-black/60 text-sm">{stat.label}</p>
             </div>
           ))}
         </motion.div>
@@ -162,7 +162,7 @@ export default function HomePage() {
           className="text-center mb-12"
         >
           <h2 className="text-4xl font-bold mb-3">Everything you need to succeed</h2>
-          <p className="text-white/50">Built for serious candidates who want real results.</p>
+          <p className="text-black/60">Built for serious candidates who want real results.</p>
         </motion.div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -179,8 +179,8 @@ export default function HomePage() {
                 <f.icon size={22} className="text-indigo-300" />
               </div>
               <div>
-                <h3 className="font-semibold text-lg mb-1">{f.title}</h3>
-                <p className="text-white/50 text-sm leading-relaxed">{f.desc}</p>
+                <h3 className="font-semibold text-lg mb-1 text-black">{f.title}</h3>
+                <p className="text-black/60 text-sm leading-relaxed">{f.desc}</p>
               </div>
             </motion.div>
           ))}
@@ -195,8 +195,8 @@ export default function HomePage() {
           viewport={{ once: true }}
           className="glass rounded-3xl p-12"
         >
-          <h2 className="text-4xl font-bold mb-4">Ready to ace your next interview?</h2>
-          <p className="text-white/50 mb-8">Join now and start practicing with AI-powered mock interviews.</p>
+          <h2 className="text-4xl font-bold mb-4 text-black">Ready to ace your next interview?</h2>
+          <p className="text-black/60 mb-8">Join now and start practicing with AI-powered mock interviews.</p>
           <Link
             href="/signup"
             className="inline-flex items-center gap-2 px-10 py-4 rounded-2xl font-semibold bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-400 hover:to-violet-500 transition-all shadow-2xl shadow-indigo-500/30 hover:scale-105"
@@ -207,7 +207,7 @@ export default function HomePage() {
       </section>
 
       {/* Footer */}
-      <footer className="relative z-10 text-center pb-8 text-white/30 text-sm">
+      <footer className="relative z-10 text-center pb-8 text-black/40 text-sm">
         © 2026 Smart Interview Coach · Built with AI
       </footer>
     </div>
